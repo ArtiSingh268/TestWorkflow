@@ -1,0 +1,62 @@
+name: Generate and Publish Test Coverage Report!
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Every Thursday at 18:00 UTC (10:00 AM PST). During PDT it will run at 11:00 AM.
+    - cron: "35 19 * * 4" # 12:05 AM Friday IST
+
+    #That will run every Thursday at 11:55 AM IST.
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Run only every other Thursday (even ISO weeks)
+      - name: Skip if not alternate Thursday
+        shell: bash
+        run: |
+          WEEK=$(date -u +%V)   # ISO week number (UTC)
+          echo "ISO week (UTC): $WEEK"
+          if (( WEEK % 2 == 1 )); then
+            echo "Odd week -> skipping (alternate-week schedule)."
+            exit 0
+          fi
+          echo "Even week -> continuing."
+
+      - name: Set up SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Run TestCoverageExport with Python 3.12 + venv
+        run: |
+          ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null abhinay@${{ secrets.QA_JUMPHOST_IP }} \
+          "ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null abhinay@${{ secrets.AUTO_SERVER_MAIN_IP }} '
+            set -e;
+
+            echo \"➡️ Checking Python version...\";
+            PY_VER=\$(python3 --version 2>/dev/null || echo \"none\")
+            if [[ \"\$PY_VER\" != *\"3.12\"* ]]; then
+              echo \"⬇️ Installing Python 3.12...\";
+              sudo add-apt-repository -y ppa:deadsnakes/ppa;
+              sudo apt-get update -y;
+              sudo apt-get install -y python3.12 python3.12-venv;
+              sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1;
+              /usr/bin/python3.12 -m ensurepip --upgrade;
+            else
+              echo \"✅ Python 3.12 is already installed\";
+            fi;
+
+            echo \"📂 Moving to project directory...\";
+            cd /opt/qa/qastax;
+
+
+            echo \"🧪 Running TestCoverageExport...\";
+            if [ -f test_coverage/TCE_config.json ]; then
+              python3 test_coverage/TestCoverageExport.py --config test_coverage/TCE_config.json
+            else
+              python3 test_coverage/TestCoverageExport.py
+            fi
+          '"
