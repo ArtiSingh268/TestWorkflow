@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     # Every Thursday at 18:00 UTC (10:00 AM PST). During PDT it will run at 11:00 AM.
-    - cron: "35 19 * * 4" # 12:05 AM Friday IST
+    - cron: "40 19 * * 4" # 12:05 AM Friday IST
 
     #That will run every Thursday at 11:55 AM IST.
 
